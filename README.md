@@ -1,3 +1,4 @@
+<img width="1920" height="1080" alt="screenshot" src="https://github.com/user-attachments/assets/553352e0-00f7-4448-a852-90e4643ec80b" />
 <div align="center">
 
 <img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" width="180" alt="TMDB"/>
@@ -17,7 +18,8 @@
 
 ## 📸 Vista previa
 
-![Vista previa de la aplicación](screenshot.png)
+<img width="1920" height="1080" alt="screenshot" src="https://github.com/user-attachments/assets/7de51893-f6cc-4b9c-817e-e1a425b3ab6a" />
+
 
 ---
 
