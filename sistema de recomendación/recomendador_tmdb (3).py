@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import requests
+import time
 from PIL import Image, ImageTk
 from io import BytesIO
 import threading
@@ -42,12 +43,31 @@ class MotorTMDB:
         self.sesion = requests.Session()
 
     def _obtener(self, endpoint, parametros={}):
-        """Realiza una petición GET a la API y devuelve el JSON de respuesta."""
+        """Realiza una petición GET a la API y devuelve el JSON de respuesta.
+        Si TMDB responde con un error temporal de servidor (502/503/504) o hay
+        un fallo de red, reintenta automáticamente un par de veces antes de fallar."""
         parametros["api_key"] = CLAVE_API
         parametros["language"] = "es-ES"  # Respuestas en español
-        respuesta = self.sesion.get(f"{URL_BASE}{endpoint}", params=parametros, timeout=10)
-        respuesta.raise_for_status()
-        return respuesta.json()
+
+        intentos_maximos = 3
+        for intento in range(1, intentos_maximos + 1):
+            try:
+                respuesta = self.sesion.get(f"{URL_BASE}{endpoint}", params=parametros, timeout=10)
+                respuesta.raise_for_status()
+                return respuesta.json()
+            except requests.exceptions.HTTPError as error:
+                codigo = error.response.status_code if error.response is not None else None
+                # Errores temporales de TMDB (no son culpa nuestra): reintentamos con espera
+                if codigo in (502, 503, 504) and intento < intentos_maximos:
+                    time.sleep(intento)  # 1s, luego 2s
+                    continue
+                raise
+            except requests.exceptions.RequestException:
+                # Timeout o problema de red: también vale la pena reintentar
+                if intento < intentos_maximos:
+                    time.sleep(intento)
+                    continue
+                raise
 
     def buscar(self, consulta):
         """Busca películas y series según el texto introducido por el usuario."""
@@ -519,6 +539,18 @@ class Aplicacion:
         """Recalcula el área de scroll cuando cambia el tamaño del marco de tarjetas."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
+    def _mensaje_error_tmdb(self, error):
+        """Convierte un error técnico en un mensaje claro para el usuario.
+        Distingue los fallos temporales del servidor de TMDB (502/503/504) de otros errores."""
+        codigo = getattr(getattr(error, "response", None), "status_code", None)
+        if codigo in (502, 503, 504):
+            return (
+                "Los servidores de TMDB están teniendo un problema temporal "
+                f"(error {codigo}). No es nada de tu lado, espera unos segundos "
+                "y vuelve a intentarlo."
+            )
+        return f"No se pudo conectar a TMDB:\n{error}"
+
     def _cargar_generos(self):
         """Descarga la lista de géneros de TMDB (películas y series) en segundo plano."""
         try:
@@ -641,7 +673,7 @@ class Aplicacion:
             )
 
         except Exception as error:
-            messagebox.showerror("Error", f"No se pudo completar la búsqueda:\n{error}")
+            messagebox.showerror("Error", self._mensaje_error_tmdb(error))
             self.texto_estado.set("Error al explorar por género")
 
     def _buscar(self):
@@ -669,8 +701,7 @@ class Aplicacion:
                 "Selecciona uno para ver recomendaciones"
             )
         except Exception as error:
-            messagebox.showerror("Error de conexión",
-                                 f"No se pudo conectar a TMDB:\n{error}")
+            messagebox.showerror("Error de conexión", self._mensaje_error_tmdb(error))
             self.texto_estado.set("Error al conectar con TMDB")
 
     def _al_seleccionar(self, evento):
@@ -727,8 +758,7 @@ class Aplicacion:
             )
 
         except Exception as error:
-            messagebox.showerror("Error",
-                                 f"No se pudieron cargar las recomendaciones:\n{error}")
+            messagebox.showerror("Error", self._mensaje_error_tmdb(error))
 
 
 # ──────────────────────────────────────────────
